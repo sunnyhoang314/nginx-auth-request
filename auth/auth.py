@@ -28,5 +28,17 @@ def health_check():
     return "Auth service is running\n", 200
 
 
+@app.route('/')
+def root():
+    """Root endpoint for testing"""
+    return "Welcome! You are authenticated.\n", 200
+
+
+@app.route('/<path:path>')
+def catch_all(path):
+    """Catch-all endpoint for testing various paths"""
+    return f"You accessed: /{path}\n", 200
+
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True) 
+    app.run(host='0.0.0.0', port=5000, debug=True)

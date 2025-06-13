@@ -1,15 +1,50 @@
 services:
+  traefik:
+    image: traefik:v3.0
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--log.level=INFO"
+    ports:
+      - "8080:80"
+      - "8081:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - traefik-network
+
   auth:
     build:
       context: ./auth
     volumes:
       - ./auth/auth.py:/app/auth.py
-  nginx:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.auth.rule=Host(`localhost`) && Path(`/auth`)"
+      - "traefik.http.routers.auth.entrypoints=web"
+      - "traefik.http.services.auth.loadbalancer.server.port=5000"
+    networks:
+      - traefik-network
+
+  app:
     build:
-      context: ./nginx
+      context: ./auth
     volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
-    ports:
-      - "8080:80"
-    depends_on:
-      - auth
+      - ./auth/auth.py:/app/auth.py
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app.rule=Host(`localhost`)"
+      - "traefik.http.routers.app.entrypoints=web"
+      - "traefik.http.services.app.loadbalancer.server.port=5000"
+      # Forward Auth middleware
+      - "traefik.http.middlewares.auth-forward.forwardauth.address=http://auth:5000/auth"
+      - "traefik.http.middlewares.auth-forward.forwardauth.trustForwardHeader=true"
+      - "traefik.http.routers.app.middlewares=auth-forward"
+    networks:
+      - traefik-network
+
+networks:
+  traefik-network:
+    driver: bridge
